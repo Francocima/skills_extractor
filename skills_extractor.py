@@ -89,27 +89,39 @@ def extract_skills(text: str) -> List[str]:
         if " " in skill and skill.lower() in text.lower():
             extracted_skills.add(skill.lower())
     
-    # Look for potential skills that are capitalized or in all-caps
-    # as they might be tools, frameworks, or languages
-    for ent in doc.ents:
-        if ent.label_ in ["ORG", "PRODUCT"] and len(ent.text) > 1 and not ent.text.isdigit():
-            skill_candidate = ent.text.lower()
-            # Check if any word in the entity is a known skill
-            for word in skill_candidate.split():
-                if word in TECHNICAL_SKILLS:
-                    extracted_skills.add(skill_candidate)
-                    break
+     # Look for potential skills that are capitalized or in all-caps
+    # Only use this if the named entity recognition is available
+    if nlp.has_pipe("ner"):
+        for ent in doc.ents:
+            if ent.label_ in ["ORG", "PRODUCT"] and len(ent.text) > 1 and not ent.text.isdigit():
+                skill_candidate = ent.text.lower()
+                # Check if any word in the entity is a known skill
+                for word in skill_candidate.split():
+                    if word in TECHNICAL_SKILLS:
+                        extracted_skills.add(skill_candidate)
+                        break
     
-    # Also check for noun chunks that might be skills
-    for chunk in doc.noun_chunks:
-        chunk_text = chunk.text.lower()
-        # Check if any part of the chunk is a known skill
-        for skill in TECHNICAL_SKILLS:
-            if skill in chunk_text and len(skill) > 1:
-                extracted_skills.add(skill)
+    # Use noun_chunks only if the parser is available
+    if nlp.has_pipe("parser"):
+        try:
+            # Also check for noun chunks that might be skills
+            for chunk in doc.noun_chunks:
+                chunk_text = chunk.text.lower()
+                # Check if any part of the chunk is a known skill
+                for skill in TECHNICAL_SKILLS:
+                    if skill in chunk_text and len(skill) > 1:
+                        extracted_skills.add(skill)
+        except Exception as e:
+            print(f"Warning: Error while processing noun chunks: {e}")
+    else:
+        # Alternative approach if noun_chunks is not available: just check for adjacent tokens
+        for i in range(len(doc) - 1):
+            bigram = f"{doc[i].text} {doc[i+1].text}".lower()
+            if bigram in TECHNICAL_SKILLS:
+                extracted_skills.add(bigram)
     
     return sorted(list(extracted_skills))
-
+  
 # Single job description endpoint (kept for backward compatibility)
 @app.post("/extract-skills", response_model=SkillsResult)
 async def extract_skills_from_job_description(job_desc: JobDescriptionItem):
