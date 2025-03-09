@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Download spaCy English model
 RUN python -m spacy download en_core_web_sm
 
+
 COPY . .
 
 # Expose port for the API
